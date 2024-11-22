@@ -8,133 +8,200 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Load data
-input_data = pd.read_csv(".venv/OOK_input_data.txt", delim_whitespace=True, header=None, names=["Time", "Amplitude"])
-output_data = pd.read_csv(".venv/OOK_output_data.txt", delim_whitespace=True, header=None, names=["Time", "Amplitude"])
+input_data = pd.read_csv(".venv/OOK_input_data.txt", delim_whitespace=True, header=None, names=["Time", "Amplitude"]).to_numpy()
+output_data = pd.read_csv(".venv/OOK_output_data.txt", delim_whitespace=True, header=None, names=["Time", "Amplitude"]).to_numpy()
 
-# Normalize data
-scaler_input = MinMaxScaler()
-scaler_output = MinMaxScaler()
-input_data_normalized = scaler_input.fit_transform(input_data[["Amplitude"]])
-output_data_normalized = scaler_output.fit_transform(output_data[["Amplitude"]])
+#Normalize data using min maxing
+input_data[:, 1] = (input_data[:, 1] - input_data[:, 1].min()) / (input_data[:, 1].max() - input_data[:, 1].min())
+output_data[:, 1] = (output_data[:, 1] - output_data[:, 1].min()) / (output_data[:, 1].max() - output_data[:, 1].min())
 
-# Split data
-data_length = len(input_data_normalized)
-train_ratio, val_ratio, test_ratio = 0.6, 0.2, 0.2
-train_end = int(train_ratio * data_length)
-val_end = int((train_ratio + val_ratio) * data_length)
+data = np.column_stack((input_data[:, 0], input_data[:, 1], output_data[:, 1]))
 
-X_train = input_data_normalized[:train_end]
-y_train = output_data_normalized[:train_end]
-X_val = input_data_normalized[train_end:val_end]
-y_val = output_data_normalized[train_end:val_end]
-X_test = input_data_normalized[val_end:]
-y_test = output_data_normalized[val_end:]
+def create_windows(data, window_size, step_size):
+    num_windows = (len(data) - window_size) // step_size + 1
+    windows = np.array([
+        data[i:i + window_size]  # Extract rows for each window
+        for i in range(0, num_windows * step_size, step_size)
+    ])
+    return windows
 
-# Create sequences
-def create_sequences(data, target, seq_length):
-    X, y = [], []
-    for i in range(len(data) - seq_length):
-        X.append(data[i:i + seq_length])
-        y.append(target[i + seq_length])
-    return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+window_size = 500
+step_size = 1
+windows = create_windows(data, window_size, step_size)
 
-seq_length = 100
-X_train_seq, y_train_seq = create_sequences(X_train, y_train, seq_length)
-X_val_seq, y_val_seq = create_sequences(X_val, y_val, seq_length)
-X_test_seq, y_test_seq = create_sequences(X_test, y_test, seq_length)
+# Split the windows into inputs (X) and targets (y)
+X = windows[:, :, [0, 1]]  # Time and input amplitude
+y = windows[:, :, [0, 2]]  # Time and output amplitude
 
-# Datasets and DataLoaders
-train_dataset = TensorDataset(X_train_seq, y_train_seq)
-val_dataset = TensorDataset(X_val_seq, y_val_seq)
-test_dataset = TensorDataset(X_test_seq, y_test_seq)
+# Print the shapes
+#(f"X Shape: {X.shape}")  # Expected: (num_windows, window_size, 2)
+#print(f"y Shape: {y.shape}")  # Expected: (num_windows, window_size, 2)
 
+# Define sizes for training, validation, and testing
+train_size = int(0.7 * len(X))  # 70% for training
+val_size = int(0.15 * len(X))   # 15% for validation
+test_size = len(X) - train_size - val_size  # Remaining 15% for testing
+
+#split data
+X_train, y_train = X[:train_size], y[:train_size]
+X_val, y_val = X[train_size:train_size + val_size], y[train_size:train_size + val_size]
+X_test, y_test = X[train_size + val_size:], y[train_size + val_size:]
+
+# Print shapes to confirm
+print(f"X_train Shape: {X_train.shape}, y_train Shape: {y_train.shape}")
+print(f"X_val Shape: {X_val.shape}, y_val Shape: {y_val.shape}")
+print(f"X_test Shape: {X_test.shape}, y_test Shape: {y_test.shape}")
+
+# Convert the training set to PyTorch tensors with double precision
+X_train_tensor = torch.tensor(X_train, dtype=torch.float64)
+y_train_tensor = torch.tensor(y_train, dtype=torch.float64)
+
+# Convert the validation set to PyTorch tensors with double precision
+X_val_tensor = torch.tensor(X_val, dtype=torch.float64)
+y_val_tensor = torch.tensor(y_val, dtype=torch.float64)
+
+# Convert the testing set to PyTorch tensors with double precision
+X_test_tensor = torch.tensor(X_test, dtype=torch.float64)
+y_test_tensor = torch.tensor(y_test, dtype=torch.float64)
+
+# Print shapes to confirm
+print(f"X_train_tensor Shape: {X_train_tensor.shape}, y_train_tensor Shape: {y_train_tensor.shape}")
+print(f"X_val_tensor Shape: {X_val_tensor.shape}, y_val_tensor Shape: {y_val_tensor.shape}")
+print(f"X_test_tensor Shape: {X_test_tensor.shape}, y_test_tensor Shape: {y_test_tensor.shape}")
+
+# Create TensorDatasets with retained time
+train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
+test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
+
+# Define batch size
 batch_size = 64
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+# Create DataLoaders
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)  # No shuffling for time-series
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
+class FiberOpticLSTM_Nonlinear(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_layers, output_dim):
+        super(FiberOpticLSTM_Nonlinear, self).__init__()
+        self.hidden_dim = hidden_dim
 
+        # Nonlinear preprocessing layer
+        self.nonlinear_preprocess = nn.Sequential(
+            nn.Linear(input_dim, input_dim * 2),  # Expand features
+            nn.ReLU(),  # Nonlinear activation
+            nn.Linear(input_dim * 2, input_dim)  # Back to original dimension
+        )
 
-# Model definition
-class LSTMModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_layers, output_dim, dropout=0.2):
-        super(LSTMModel, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
+        # LSTM layer
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+
+        # Fully connected layer
         self.fc = nn.Linear(hidden_dim, output_dim)
-        self.hidden_activation = nn.ReLU()
 
     def forward(self, x):
-        lstm_out, _ = self.lstm(x)
-        lstm_out = self.hidden_activation(lstm_out)  # Apply ReLU to LSTM output
-        last_inner_state = lstm_out[:, -1, :]  # Take the last output
-        out = self.fc(last_inner_state)
-        return out
+        # Nonlinear feature preprocessing
+        x = self.nonlinear_preprocess(x)
 
-# Weight initialization
-def init_weights(model):
-    for name, param in model.named_parameters():
-        if "weight" in name and "lstm" in name:
-            nn.init.xavier_uniform_(param)
-        elif "bias" in name:
-            nn.init.zeros_(param)
+        # LSTM forward pass
+        lstm_out, _ = self.lstm(x)  # Ignore hidden and cell states
 
-model = LSTMModel(1, 256, 5, 1)
-init_weights(model)
+        # Fully connected layer for each time step
+        predictions = self.fc(lstm_out)
 
-# Training setup
+        return predictions
+# Instantiate the model
+input_dim = 2  # Time and input amplitude
+hidden_dim = 64  # Number of LSTM units
+num_layers = 2  # Number of LSTM layers
+output_dim = 2  # Time and output amplitude
+
+model = FiberOpticLSTM_Nonlinear(input_dim, hidden_dim, num_layers, output_dim)
+model = model.double()
+
+# Define loss function and optimizer
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+# Early stopping configuration
+class EarlyStopping:
+    def __init__(self, patience=10, delta=0.001):
+        self.patience = patience
+        self.delta = delta
+        self.best_loss = float('inf')
+        self.counter = 0
+
+    def step(self, validation_loss):
+        if validation_loss < self.best_loss - self.delta:
+            self.best_loss = validation_loss
+            self.counter = 0
+            return False  # Don't stop
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True  # Stop training
+        return False
+
 # Training loop
-def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=20):
+def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=100, patience=10):
+    train_losses = []
+    val_losses = []
+
+    early_stopping = EarlyStopping(patience=patience)
+
     for epoch in range(num_epochs):
+        # Training phase
         model.train()
-        train_loss = 0.0
+        running_loss = 0.0
         for X_batch, y_batch in train_loader:
             optimizer.zero_grad()
             predictions = model(X_batch)
             loss = criterion(predictions, y_batch)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
             optimizer.step()
-            train_loss += loss.item()
-        train_loss /= len(train_loader)
+            running_loss += loss.item()
 
-        val_loss = evaluate_model(model, val_loader, criterion)
+        train_losses.append(running_loss / len(train_loader))
 
-        print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.6f}, Validation Loss: {val_loss:.6f}")
+        # Validation phase
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for X_batch, y_batch in val_loader:
+                predictions = model(X_batch)
+                loss = criterion(predictions, y_batch)
+                val_loss += loss.item()
 
-def evaluate_model(model, loader, criterion):
-    model.eval()
-    val_loss = 0.0
-    with torch.no_grad():
-        for X_batch, y_batch in loader:
-            predictions = model(X_batch)
-            loss = criterion(predictions, y_batch)
-            val_loss += loss.item()
-    return val_loss / len(loader)
+        val_losses.append(val_loss / len(val_loader))
 
-# Train and evaluate
-train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=20)
-test_loss = evaluate_model(model, test_loader, criterion)
-print(f"Test Loss: {test_loss:.6f}")
+        print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_losses[-1]:.4f}, Val Loss: {val_losses[-1]:.4f}")
 
-# Plot predictions
-def plot_predictions(model, loader, scaler_output):
-    model.eval()
-    predictions, actuals = [], []
-    with torch.no_grad():
-        for X_batch, y_batch in loader:
-            preds = model(X_batch)
-            predictions.append(preds.numpy())
-            actuals.append(y_batch.numpy())
-    predictions = np.concatenate(predictions).reshape(-1, 1)
-    actuals = np.concatenate(actuals).reshape(-1, 1)
-    predictions = scaler_output.inverse_transform(predictions)
-    actuals = scaler_output.inverse_transform(actuals)
-    plt.plot(actuals, label="True Values", alpha=0.8)
-    plt.plot(predictions, label="Predictions", alpha=0.6)
-    plt.legend()
-    plt.show()
+        if early_stopping.step(val_losses[-1]):
+            print("Early stopping triggered")
+            break
 
-plot_predictions(model, test_loader, scaler_output)
+    return train_losses, val_losses
+
+# Train the model
+batch_size = 64
+num_epochs = 100
+train_losses, val_losses = train_model(
+    model,
+    train_loader=train_loader,
+    val_loader=val_loader,
+    criterion=criterion,
+    optimizer=optimizer,
+    num_epochs=num_epochs,
+    patience=10
+)
+
+# Plot learning curves
+plt.figure(figsize=(12, 6))
+plt.plot(train_losses, label="Train Loss")
+plt.plot(val_losses, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Training and Validation Loss")
+plt.legend()
+plt.show()
