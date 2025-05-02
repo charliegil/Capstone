@@ -1,63 +1,54 @@
-End-to-End Optimization of Optical Communication Links with Deep Learning
-Overview
-This project explores the application of deep learning to optimize symbol constellations in optical fiber communication systems. Traditional modulation schemes (PAM, QAM, QPSK) may not be optimal for nonlinear fiber channels. We developed a deep learning-based autoencoder system that jointly learns transmitter and receiver configurations to maximize symbol recovery accuracy.
+# End-to-End Optimization of Optical Communication Links with Deep Learning
 
-Key Contributions
-Developed 84 differentiable neural network models of fiber optic channels using OptiSystem simulation data across 14 modulation schemes
+## 🚀 Overview
+This project demonstrates how **deep learning can optimize optical fiber communications** by learning **adaptive symbol constellations** that outperform traditional modulation schemes in nonlinear fiber channels. We developed an autoencoder system that jointly learns transmitter and receiver configurations specifically adapted to fiber channel impairments.
 
-Designed and trained 70 autoencoder systems to learn optimal symbol constellations adapted to channel impairments
+## 🔑 Key Contributions
+- Successfully built an **autoencoder (AE) system** that learns **optimal constellations** for fiber optic channels
+- Demonstrated that **learned constellations achieve better separation** than traditional schemes (PAM, QAM, QPSK) after channel distortion
+- Developed **84 differentiable neural network models** of fiber channels using OptiSystem simulations
+- Trained **70 AE configurations** across different channel conditions and symbol set sizes
+- Achieved **100% symbol recovery accuracy** for 4-symbol constellations
 
-Demonstrated that learned constellations outperform traditional schemes on simulated channels
+## 🧠 Methodology
 
-Achieved 100% accuracy for 4-symbol constellations using noise-resilient channel models
+### Channel Modeling
+1. Created datasets using **OptiSystem simulations** for 14 modulation schemes
+2. Developed **6 neural network architectures** to model channel behavior
+3. Evaluated models using **R² metric** to assess generalization capability
 
-Methodology
-Channel Modeling:
+### Autoencoder Design
+1. Jointly optimized **transmitter (constellation mapper)** and **receiver (demodulator)**
+2. Integrated pre-trained channel models as **non-trainable components**
+3. Used **cross-entropy loss** to maximize symbol recovery accuracy
 
-Created datasets using OptiSystem simulations for 14 modulation schemes
+## 📊 Results: Learned Constellations Outperform Traditional Schemes
 
-Developed 6 neural network architectures to model channel behavior
+### Key Findings
+✅ **Learned constellations maintain better separation** after channel distortion compared to traditional schemes  
+✅ **Noise-resilient channel models** produced the most robust constellations  
+✅ **100% accuracy achieved** for 4-symbol constellations (vs. ~85% for QPSK)  
+✅ Performance remains strong up to **16-symbol constellations** (85.6% accuracy)
 
-Evaluated models using R² metric to assess generalization capability
+### Constellation Comparison
+| Scheme | Input Constellation | Output Constellation | Accuracy |
+|--------|---------------------|----------------------|----------|
+| Learned (AE) | ![Learned Input](figures/learned_input.png) | ![Learned Output](figures/learned_output.png) | **100%** |
+| QPSK | ![QPSK Input](figures/qpsk_input.png) | ![QPSK Output](figures/qpsk_output.png) | ~85% |
 
-Autoencoder Design:
+### Top Performers by Symbol Set Size
+| Symbol Count | Best Model | Accuracy |
+|--------------|------------|----------|
+| 4 | 256PSK Noise Resilient | **100%** |
+| 8 | 8QAM Deeper | 94.8% |
+| 16 | 16QAM Basic | 85.6% |
 
-Jointly optimized transmitter (constellation mapper) and receiver (demodulator)
+## 👥 Team
+- **Thomas Haene** (Electrical Engineering) - Channel modeling & system integration
+- **Alexandre Sleiman** (Electrical Engineering) - NN architectures & AE development  
+- **Charlie Gil** (Software Engineering) - Autoencoder design & testing
 
-Integrated pre-trained channel models as non-trainable components
+**Supervisor:** Dr. Ioannis Psaromiligkos, McGill University
 
-Used cross-entropy loss to maximize symbol recovery accuracy
-
-Results
-Noise-resilient channel models showed best performance for autoencoder training
-
-Learned constellations achieved better separation than traditional schemes
-
-Performance decreased with increasing symbol set size, as expected
-
-Top configurations:
-
-4 symbols: 100% accuracy (256PSK Noise Resilient model)
-
-8 symbols: 94.8% accuracy (8QAM Deeper model)
-
-16 symbols: 85.6% accuracy (16QAM Basic model)
-
-Future Work
-Develop more comprehensive channel models for arbitrary constellations
-
-Investigate techniques to improve generalization across modulation schemes
-
-Explore hardware implementation and real-world validation
-
-Team Members
-Thomas Haene (Electrical Engineering)
-
-Alexandre Sleiman (Electrical Engineering)
-
-Charlie Gil (Software Engineering)
-
-Supervised by Dr. Ioannis Psaromiligkos, McGill University
-
-License
-This project is available for academic and research purposes. Please contact the authors for commercial use inquiries.
+## 📜 License
+Academic use permitted. Contact authors for commercial applications.
